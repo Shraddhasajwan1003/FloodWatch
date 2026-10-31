@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@theme {
+  /* FloodWatch India design tokens */
+  --color-navy: #101820;
+  --color-slate: #263746;
+  --color-gold: #B79A62;
+  --color-gold-light: #D4BC8A;
+  --color-muted: #667085;
+  --color-surface: #F4F6F8;
+
+  /* Flood risk colours - used ONLY for risk levels */
+  --color-risk-green: #16A34A;
+  --color-risk-yellow: #EAB308;
+  --color-risk-orange: #F97316;
+  --color-risk-red: #DC2626;
+
+  /* Typography */
+  --font-family-sans: 'Inter', 'Noto Sans Devanagari', system-ui, sans-serif;
+  --font-family-display: 'Inter', 'Noto Sans Devanagari', system-ui, sans-serif;
+}
+
+/* Base styles */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  font-family: var(--font-family-sans);
+  background-color: #F4F6F8;
+  color: #101820;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Focus styles for keyboard navigation */
+:focus-visible {
+  outline: 3px solid #B79A62;
+  outline-offset: 2px;
+}
+
+/* Leaflet map overrides */
+.leaflet-container {
+  font-family: var(--font-family-sans) !important;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+/* Risk level utility classes */
+.risk-green {
+  background-color: #16A34A;
+  color: white;
+}
+.risk-yellow {
+  background-color: #EAB308;
+  color: #101820;
+}
+.risk-orange {
+  background-color: #F97316;
+  color: white;
+}
+.risk-red {
+  background-color: #DC2626;
+  color: white;
+}
+.risk-unknown {
+  background-color: #667085;
+  color: white;
+}
+
+/* Skeleton loading animation */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.skeleton {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  background-color: #E2E8F0;
+  border-radius: 4px;
+}

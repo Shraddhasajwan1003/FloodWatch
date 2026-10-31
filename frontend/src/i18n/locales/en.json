@@ -1,0 +1,173 @@
+{
+  "nav": {
+    "home": "Home",
+    "map": "Flood Map",
+    "forecasts": "Forecasts",
+    "safeRoutes": "Safe Routes",
+    "rivers": "River Monitoring",
+    "report": "Report Flooding",
+    "about": "Data & Sources",
+    "checkMyArea": "Check My Area",
+    "notifications": "Notifications",
+    "language": "Language",
+    "accessibility": "Accessibility"
+  },
+  "hero": {
+    "headline": "Know the Risk. Plan a Safer Route.",
+    "subtext": "FloodWatch India combines weather forecasts, river observations, geographical risk data, and community reports to help you make informed decisions during flood events.",
+    "cta": {
+      "map": "Explore Live Flood Map",
+      "area": "Check My Area",
+      "routes": "Plan a Safer Route"
+    },
+    "disclaimer": "This is a decision-support platform, not a replacement for official emergency services."
+  },
+  "utilityBar": {
+    "emergency": "Emergency: Call 112",
+    "disclaimer": "This platform provides decision support only. Always follow official emergency instructions.",
+    "dataSources": "Data Sources",
+    "time": "IST"
+  },
+  "risk": {
+    "levels": {
+      "green": "Below Warning",
+      "yellow": "Watch",
+      "orange": "High Risk",
+      "red": "Severe Risk",
+      "unknown": "Data Unavailable"
+    },
+    "provisional": "Provisional estimate — model not yet calibrated",
+    "officialOverride": "Level elevated by official alert",
+    "missingData": "Missing data",
+    "explanation": "Why this risk level?"
+  },
+  "data": {
+    "live": "LIVE",
+    "stale": "STALE",
+    "unavailable": "UNAVAILABLE",
+    "estimated": "ESTIMATED",
+    "retrievedAt": "Retrieved",
+    "observedAt": "Observed",
+    "updatedAt": "Updated",
+    "source": "Source",
+    "attribution": "Attribution",
+    "noData": "No data available"
+  },
+  "map": {
+    "title": "Live Flood Map",
+    "layers": {
+      "rainfall": "Rainfall",
+      "risk": "Flood Risk",
+      "rivers": "River Gauges",
+      "alerts": "Official Alerts",
+      "reports": "Community Reports",
+      "facilities": "Hospitals & Shelters"
+    },
+    "attribution": "Map data © OpenStreetMap contributors",
+    "selectArea": "Select an area to view details",
+    "loading": "Loading map data...",
+    "error": "Map data unavailable"
+  },
+  "rainfall": {
+    "title": "Rainfall",
+    "last1h": "Last 1 hour",
+    "last6h": "Last 6 hours",
+    "last24h": "Last 24 hours",
+    "forecast24h": "Forecast (next 24h)",
+    "units": "mm",
+    "modelReanalysis": "Model reanalysis (not directly observed)",
+    "weatherForecast": "Weather model forecast",
+    "notFloodForecast": "This is a weather forecast, not a flood forecast."
+  },
+  "rivers": {
+    "title": "River Monitoring",
+    "discharge": "Discharge",
+    "units_m3s": "m³/s",
+    "gloFASDisclaimer": "River discharge values are from the GloFAS hydrological model via Open-Meteo. These are model estimates, not official Indian gauge observations.",
+    "warningLevel": "Warning level",
+    "dangerLevel": "Danger level",
+    "noThreshold": "Thresholds not available",
+    "trend": "Trend"
+  },
+  "routes": {
+    "title": "Safe Route Planner",
+    "origin": "Origin",
+    "destination": "Destination",
+    "searchOrigin": "Search for origin...",
+    "searchDest": "Search for destination...",
+    "useMyLocation": "Use my location",
+    "calculate": "Find Safer Routes",
+    "fastest": "Fastest",
+    "balanced": "Balanced",
+    "lowerRisk": "Lower Estimated Exposure",
+    "distance": "Distance",
+    "duration": "Est. time",
+    "floodExposure": "Flood exposure",
+    "hazards": "Known hazards",
+    "disclaimer": "Route recommendations are based on available data and do not guarantee safety. Always use local knowledge and follow official guidance.",
+    "noRoutes": "No routes found for the selected locations."
+  },
+  "reports": {
+    "title": "Report Flooding",
+    "category": {
+      "waterlogging": "Waterlogging",
+      "road_blocked": "Road Blocked",
+      "bridge_damage": "Bridge Damage",
+      "basement_flooding": "Basement Flooding",
+      "drain_overflow": "Drain Overflow",
+      "other": "Other"
+    },
+    "description": "Description",
+    "waterDepth": "Approximate water depth (cm)",
+    "roadBlocked": "This road is blocked",
+    "photo": "Add photo (optional)",
+    "submit": "Submit Report",
+    "submitting": "Submitting...",
+    "unverified": "Reports are initially UNVERIFIED and reviewed before influencing risk scores.",
+    "success": "Report submitted successfully. It will be reviewed before appearing on the map.",
+    "statuses": {
+      "unverified": "Unverified",
+      "under_review": "Under Review",
+      "corroborated": "Corroborated",
+      "verified": "Verified",
+      "rejected": "Rejected",
+      "expired": "Expired"
+    }
+  },
+  "facilities": {
+    "title": "Hospitals & Shelters",
+    "types": {
+      "hospital": "Hospital",
+      "shelter": "Shelter",
+      "relief_camp": "Relief Camp",
+      "fire_station": "Fire Station",
+      "police_station": "Police Station"
+    },
+    "distance": "Distance",
+    "phone": "Phone",
+    "verified": "Verified",
+    "unverified": "Not verified",
+    "operationalUnknown": "Operational status unknown",
+    "disclaimer": "Verify facility status before travelling. Operational status may change during emergencies."
+  },
+  "coverage": {
+    "title": "Data Coverage",
+    "supported": "Supported monitoring locations",
+    "partial": "Partial coverage",
+    "none": "No data coverage",
+    "explanation": "Real-time data is not available for all Indian districts. Gaps are shown explicitly rather than estimated."
+  },
+  "errors": {
+    "fetchFailed": "Unable to fetch data. Please try again.",
+    "locationPermission": "Location access denied. Please search manually.",
+    "routeNotFound": "Could not calculate a route for these locations.",
+    "apiError": "An error occurred. Please refresh the page."
+  },
+  "a11y": {
+    "skipToContent": "Skip to main content",
+    "toggleMenu": "Toggle navigation menu",
+    "closePanel": "Close panel",
+    "loading": "Loading...",
+    "mapDescription": "Interactive map of India showing flood risk, river levels, and alerts"
+  }
+}
