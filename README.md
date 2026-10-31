@@ -102,6 +102,81 @@ Open your browser at: **http://localhost:5173**
 
 ---
 
+## ☁️ Production Deployment (Vercel + Render)
+
+Deploy the Vite frontend to Vercel and the FastAPI API to Render. The backend
+uses SQLite locally, but use Render PostgreSQL for production data so it
+survives service restarts and redeploys.
+
+### 1. Create the Render database
+
+1. In the [Render Dashboard](https://dashboard.render.com/), create a PostgreSQL
+   database in the same region as the backend web service.
+2. Copy its **Internal Database URL**. Render supplies a URL beginning with
+   `postgres://` or `postgresql://`; for this async SQLAlchemy app, use the same
+   credentials and host, but change the scheme to
+   `postgresql+asyncpg://`.
+
+### 2. Deploy the backend to Render
+
+Create a **Web Service** connected to this repository and configure:
+
+| Setting | Value |
+|---|---|
+| Root Directory | `backend` |
+| Runtime | Python |
+| Build Command | `pip install -r requirements.txt` |
+| Start Command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+
+Add these environment variables to the web service:
+
+| Key | Value |
+|---|---|
+| `DATABASE_URL` | Render PostgreSQL URL with the `postgresql+asyncpg://` scheme |
+| `ALLOWED_ORIGINS` | JSON array of the Vercel site origins, e.g. `["https://your-app.vercel.app"]` |
+| `DEBUG` | `false` |
+| `SECRET_KEY` | A unique random secret; generate locally with `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
+
+If you use a custom Vercel domain, include that exact origin in `ALLOWED_ORIGINS`
+as well. Origins must include `https://` and must not have a trailing slash.
+After deployment, check `https://<your-render-service>.onrender.com/api/health`;
+interactive API documentation is at `/api/docs`.
+
+### 3. Deploy the frontend to Vercel
+
+1. Import the same repository in Vercel.
+2. Set **Root Directory** to `frontend` and use:
+   - Framework Preset: **Vite**
+   - Build Command: `npm run build`
+   - Output Directory: `dist`
+3. Add this environment variable before deploying:
+
+   | Key | Value |
+   |---|---|
+   | `VITE_API_BASE_URL` | `https://<your-render-service>.onrender.com/api/v1` |
+
+   The variable must include `/api/v1`. Vite reads it at build time, so redeploy
+   after changing it.
+4. Once Vercel gives you the site URL, add that URL to the Render service's
+   `ALLOWED_ORIGINS` value and redeploy/restart the backend.
+
+`frontend/vercel.json` sends app routes to the Vite entry point so URLs such as
+`/map` also work when opened or refreshed directly.
+
+### Production notes
+
+- Render's local filesystem is ephemeral unless you attach a persistent disk.
+  Uploaded report photos are currently stored in `backend/uploads`; to retain
+  photos across deploys, mount a Render persistent disk there and set
+  `UPLOAD_DIR` to that mount path. Alternatively, use object storage for uploads.
+- Render free web services may sleep when idle, so the first API request after
+  inactivity can take longer. Use an always-on service for production/emergency
+  use.
+- SQLite is suitable for local development only on ephemeral hosting. The
+  backend creates database tables and seeds reference data when it starts.
+
+---
+
 ## 🧪 Running Automated Tests
 
 To run the complete backend test suite:
