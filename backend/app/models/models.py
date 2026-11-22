@@ -72,6 +72,48 @@ class FacilityType(str, enum.Enum):
     POLICE_STATION = "police_station"
 
 
+class RescueStatus(str, enum.Enum):
+    NEEDS_RESCUE = "needs_rescue"
+    IN_PROGRESS = "in_progress"
+    RESCUED = "rescued"
+    SAFE = "safe"
+
+
+class UserRole(str, enum.Enum):
+    CITIZEN = "citizen"
+    VOLUNTEER = "volunteer"
+    ADMIN = "admin"
+
+
+class HazardType(str, enum.Enum):
+    FLOOD = "flood"
+    THUNDERSTORM = "thunderstorm"
+    CYCLONE = "cyclone"
+    EARTHQUAKE = "earthquake"
+    FIRE = "fire"
+    HEATWAVE = "heatwave"
+    GENERAL = "general"
+
+
+# ── User Account Model ─────────────────────────────────────────────────────────
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(300), nullable=False)
+    full_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    phone: Mapped[Optional[str]] = mapped_column(String(32))
+    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.CITIZEN)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    preferred_lat: Mapped[Optional[float]] = mapped_column(Float)
+    preferred_lon: Mapped[Optional[float]] = mapped_column(Float)
+    district_code: Mapped[Optional[str]] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 # ── Geographic Hierarchy ────────────────────────────────────────────────────────
 
 
@@ -186,6 +228,7 @@ class RiverStation(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    state = relationship("State")
     observations = relationship("RiverObservation", back_populates="station")
 
 
@@ -223,9 +266,11 @@ class OfficialAlert(Base):
     source_url: Mapped[Optional[str]] = mapped_column(String(500))
     issuer: Mapped[str] = mapped_column(String(200), nullable=False)
     severity: Mapped[AlertSeverity] = mapped_column(Enum(AlertSeverity), nullable=False)
+    hazard_type: Mapped[str] = mapped_column(String(64), default="flood")
     headline: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
     area_description: Mapped[Optional[str]] = mapped_column(Text)
+    dos_and_donts_json: Mapped[Optional[str]] = mapped_column(Text)
     # Bounding box for the alert area (if available)
     area_lat_min: Mapped[Optional[float]] = mapped_column(Float)
     area_lon_min: Mapped[Optional[float]] = mapped_column(Float)
@@ -305,6 +350,38 @@ class CommunityReport(Base):
     district_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("districts.id"))
     # Source IP hash (for dedup, not stored as raw IP)
     submitter_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    # AI Forgery & Duplicate Detection Layer
+    ai_trust_score: Mapped[Optional[float]] = mapped_column(Float, default=92.0)
+    ai_flags_json: Mapped[Optional[str]] = mapped_column(Text)
+    is_suspicious: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+# ── Community Rescue Requests (Who is rescued vs awaiting rescue) ───────────────
+
+
+class RescueRequest(Base):
+    __tablename__ = "rescue_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contact_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    phone: Mapped[str] = mapped_column(String(32), nullable=False)
+    lat: Mapped[float] = mapped_column(Float, nullable=False)
+    lon: Mapped[float] = mapped_column(Float, nullable=False)
+    address_landmark: Mapped[str] = mapped_column(Text, nullable=False)
+    people_count: Mapped[int] = mapped_column(Integer, default=1)
+    has_infants_or_elderly: Mapped[bool] = mapped_column(Boolean, default=False)
+    medical_emergency_notes: Mapped[Optional[str]] = mapped_column(Text)
+    water_level_stage: Mapped[str] = mapped_column(String(32), default="ankle")  # ankle, knee, waist, chest, rooftop
+    status: Mapped[RescueStatus] = mapped_column(
+        Enum(RescueStatus), default=RescueStatus.NEEDS_RESCUE
+    )
+    rescued_by: Mapped[Optional[str]] = mapped_column(String(150))
+    rescue_notes: Mapped[Optional[str]] = mapped_column(Text)
+    ai_trust_score: Mapped[Optional[float]] = mapped_column(Float, default=95.0)
+    ai_flags_json: Mapped[Optional[str]] = mapped_column(Text)
+    is_suspicious: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 # ── Facilities (Hospitals, Shelters) ──────────────────────────────────────────

@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
     logger.info("Reference data seeded")
     yield
 
-    logger.info("Shutting down FloodWatch India")
+    logger.info("Shutting down JalDrishti India")
 
 
 app = FastAPI(

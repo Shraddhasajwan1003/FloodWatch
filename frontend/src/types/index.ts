@@ -139,6 +139,7 @@ export interface OfficialAlert {
   source_id: string;
   issuer: string;
   severity: AlertSeverity;
+  hazard_type?: string;
   headline: string;
   description?: string;
   area_description?: string;
@@ -146,6 +147,7 @@ export interface OfficialAlert {
   expires_at?: string;
   retrieved_at: string;
   is_active: boolean;
+  dos_and_donts?: { dos: string[]; donts: string[]; title?: string };
 }
 
 // ── Safe Routes ───────────────────────────────────────────────────────────────
@@ -167,7 +169,7 @@ export interface RouteOption {
   flood_exposure_label: RiskLevel;
   known_hazards: string[];
   road_closures: string[];
-  geometry: string;  // Encoded polyline
+  geometry: any;  // GeoJSON LineString or coordinates
   steps: RouteStep[];
   explanation: string;
   data_coverage: string;
@@ -190,6 +192,11 @@ export type ReportCategory =
   | 'bridge_damage'
   | 'basement_flooding'
   | 'drain_overflow'
+  | 'cyclone_damage'
+  | 'landslide'
+  | 'fire_flood'
+  | 'earthquake_damage'
+  | 'lightning_strike'
   | 'other';
 
 export interface CommunityReport {
@@ -205,6 +212,43 @@ export interface CommunityReport {
   expires_at?: string;
   image_url?: string;
   district_id?: number;
+  ai_trust_score?: number;
+  ai_flags_json?: string;
+  is_suspicious?: boolean;
+}
+
+// ── Community Rescue Tracker ──────────────────────────────────────────────────
+export type RescueStatus = 'needs_rescue' | 'in_progress' | 'rescued' | 'safe';
+
+export interface RescueRequest {
+  id: number;
+  contact_name: string;
+  phone: string;
+  lat: number;
+  lon: number;
+  address_landmark: string;
+  people_count: number;
+  has_infants_or_elderly: boolean;
+  medical_emergency_notes?: string;
+  water_level_stage: string; // ankle, knee, waist, chest, rooftop
+  status: RescueStatus;
+  rescued_by?: string;
+  rescue_notes?: string;
+  ai_trust_score: number;
+  ai_flags_json?: string;
+  is_suspicious: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface RescueStatistics {
+  total_requests: number;
+  needs_rescue: number;
+  in_progress: number;
+  rescued: number;
+  safe: number;
+  people_awaiting_rescue: number;
+  people_rescued: number;
 }
 
 // ── Facilities ────────────────────────────────────────────────────────────────
@@ -250,6 +294,86 @@ export interface Notification {
   district_id?: number;
   state_id?: number;
 }
+
+// ── Marine & Coastal Fishermen Safety ─────────────────────────────────────────
+export interface MarineHourlyPoint {
+  time: string;
+  wave_height_m: number | null;
+  swell_wave_height_m: number | null;
+  wave_period_s: number | null;
+  swell_wave_period_s: number | null;
+}
+
+export interface MarineConditions {
+  lat: number;
+  lon: number;
+  retrieved_at: string;
+  current_wave_height_m: number;
+  max_wave_height_3d_m: number;
+  current_swell_height_m: number;
+  advisory_status: string;
+  advisory_level: 'green' | 'yellow' | 'orange' | 'red';
+  advisory_reason: string;
+  port_signal: string;
+  hourly: MarineHourlyPoint[];
+  attribution: string;
+  disclaimer: string;
+}
+
+export interface CoastalFishingZone {
+  zone_id: string;
+  name: string;
+  coast: string;
+  state_code: string;
+  district: string;
+  lat: number;
+  lon: number;
+  port_warning_signal: string;
+  typical_crafts: string[];
+}
+
+export interface RiverbankHighFlowZone {
+  zone_id: string;
+  river: string;
+  name: string;
+  district: string;
+  state_code: string;
+  lat: number;
+  lon: number;
+  vulnerability_type: string;
+  buffer_evacuation_distance_m: number;
+  emergency_advice: string;
+}
+
+// ── User Authentication & Profile ─────────────────────────────────────────────
+export type UserRole = 'citizen' | 'volunteer' | 'admin';
+
+export interface User {
+  id: number;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  phone?: string;
+  preferred_lat?: number;
+  preferred_lon?: number;
+  district_code?: string;
+}
+
+export interface AuthResponse {
+  status: string;
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
+// ── Multi-Hazard Dos and Don'ts ───────────────────────────────────────────────
+export interface DosAndDontsItem {
+  title: string;
+  dos: string[];
+  donts: string[];
+}
+
+export type DosAndDontsRegistry = Record<string, DosAndDontsItem>;
 
 // ── API error ─────────────────────────────────────────────────────────────────
 export interface ApiError {

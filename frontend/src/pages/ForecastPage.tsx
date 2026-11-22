@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getForecasts, getDistricts, getRainfall } from '@/lib/api';
+import { getForecasts, getDistricts, getRainfall, getFloodRisk, getAlerts } from '@/lib/api';
 import { RainfallChart } from '@/components/RainfallChart';
 import { RiskBadge } from '@/components/RiskBadge';
 import {
@@ -11,14 +11,19 @@ import {
   MapPin,
   Loader2,
   TrendingUp,
+  Navigation,
+  ShieldCheck,
+  Thermometer,
+  Compass,
 } from 'lucide-react';
 
 export const ForecastPage: React.FC = () => {
   const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lon: number; name: string }>({
     lat: 26.1445,
     lon: 91.7362,
-    name: 'Guwahati (Kamrup), Assam',
+    name: 'Kamrup (Guwahati), Assam',
   });
+  const [isLocating, setIsLocating] = useState(false);
 
   const { data: districts = [] } = useQuery({
     queryKey: ['districts'],
@@ -35,20 +40,75 @@ export const ForecastPage: React.FC = () => {
     queryFn: () => getRainfall(selectedCoords.lat, selectedCoords.lon, 48),
   });
 
+  const { data: liveRisk } = useQuery({
+    queryKey: ['locationRisk', selectedCoords.lat, selectedCoords.lon],
+    queryFn: () => getFloodRisk(selectedCoords.lat, selectedCoords.lon),
+  });
+
+  const { data: allAlerts = [] } = useQuery({
+    queryKey: ['alertsForecastPage'],
+    queryFn: () => getAlerts(),
+  });
+
+  const handleUseMyLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(4));
+        const lon = Number(pos.coords.longitude.toFixed(4));
+
+        // Find closest district name
+        let closestName = `My GPS Position (${lat}°N, ${lon}°E)`;
+        if (districts.length > 0) {
+          let minDist = Infinity;
+          for (const d of districts) {
+            const dist = Math.hypot(d.centroid_lat - lat, d.centroid_lon - lon);
+            if (dist < minDist && dist < 0.8) {
+              minDist = dist;
+              closestName = `${d.name} (Near My Location)`;
+            }
+          }
+        }
+
+        setSelectedCoords({ lat, lon, name: closestName });
+        setIsLocating(false);
+      },
+      (err) => {
+        alert('Could not access your location. Please check browser permissions.');
+        setIsLocating(false);
+      }
+    );
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Title */}
-      <div>
-        <div className="text-xs font-bold uppercase tracking-wider text-amber-600">
-          Atmospheric & Hydrological Outlook
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="text-xs font-bold uppercase tracking-wider text-amber-600">
+            Atmospheric & Hydrological Outlook
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mt-1 flex items-center gap-2">
+            <CloudRain className="w-7 h-7 text-amber-600" />
+            <span>24-Hour & 7-Day Rainfall & Flood Outlook</span>
+          </h1>
+          <p className="text-xs sm:text-sm text-gray-600 max-w-3xl mt-1">
+            Combines high-resolution atmospheric precipitation modeling with live watershed hydrological risk projections across 70+ Indian districts.
+          </p>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mt-1 flex items-center gap-2">
-          <CloudRain className="w-7 h-7 text-amber-600" />
-          <span>24-Hour & 7-Day Rainfall & Flood Outlook</span>
-        </h1>
-        <p className="text-xs sm:text-sm text-gray-600 max-w-3xl mt-1">
-          Combines high-resolution atmospheric precipitation modeling with watershed hydrological risk projections.
-        </p>
+
+        <button
+          onClick={handleUseMyLocation}
+          disabled={isLocating}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#101820] hover:bg-gray-800 text-white text-xs font-bold transition-all shadow-sm shrink-0"
+        >
+          <Navigation className={`w-3.5 h-3.5 text-[#B79A62] ${isLocating ? 'animate-spin' : ''}`} />
+          <span>{isLocating ? 'Locating Device GPS...' : 'Use My Current Location'}</span>
+        </button>
       </div>
 
       {/* Critical Scientific Disclaimer */}
@@ -59,11 +119,79 @@ export const ForecastPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Location Picker */}
+      {/* Current Position Live Weather & Risk Summary Card */}
+      <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700">
+              <MapPin className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-bold text-sm text-gray-900">{selectedCoords.name}</div>
+              <div className="text-[11px] text-gray-500 font-mono">
+                {selectedCoords.lat.toFixed(4)}°N, {selectedCoords.lon.toFixed(4)}°E
+              </div>
+            </div>
+          </div>
+
+          {liveRisk && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-600 font-semibold">Localized Risk:</span>
+              <RiskBadge level={liveRisk.displayed_level} score={Math.round(liveRisk.score || 0)} size="md" />
+            </div>
+          )}
+        </div>
+
+        {/* Live Weather Metrics for Selected Location */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
+            <span className="text-gray-500 text-[11px]">Past 1-Hour Rain</span>
+            <div className="text-lg font-bold font-mono text-gray-900 mt-0.5">
+              {hourlyRainfall?.total_1h_mm !== null && hourlyRainfall?.total_1h_mm !== undefined
+                ? `${hourlyRainfall.total_1h_mm} mm`
+                : '0.0 mm'}
+            </div>
+          </div>
+
+          <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
+            <span className="text-gray-500 text-[11px]">24-Hour Accumulation</span>
+            <div className="text-lg font-bold font-mono text-blue-700 mt-0.5">
+              {hourlyRainfall?.total_24h_mm !== null && hourlyRainfall?.total_24h_mm !== undefined
+                ? `${hourlyRainfall.total_24h_mm} mm`
+                : 'Calculating'}
+            </div>
+          </div>
+
+          <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
+            <span className="text-gray-500 text-[11px]">24-Hour Forecast Rain</span>
+            <div className="text-lg font-bold font-mono text-amber-700 mt-0.5">
+              {hourlyRainfall?.forecast_24h_mm !== null && hourlyRainfall?.forecast_24h_mm !== undefined
+                ? `${hourlyRainfall.forecast_24h_mm} mm`
+                : 'Generating'}
+            </div>
+          </div>
+
+          <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
+            <span className="text-gray-500 text-[11px]">Active Location Alerts</span>
+            <div className="text-lg font-bold font-mono text-emerald-700 mt-0.5">
+              {allAlerts.length > 0 ? `${allAlerts.length} Advisory` : 'None Active'}
+            </div>
+          </div>
+        </div>
+
+        {liveRisk?.explanation && (
+          <div className="text-xs text-gray-600 bg-gray-50 p-2.5 rounded-lg border border-gray-100 flex items-start gap-2">
+            <Info className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
+            <span>{liveRisk.explanation}</span>
+          </div>
+        )}
+      </div>
+
+      {/* District Dropdown Selector */}
       <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-xs font-bold text-gray-800">
           <MapPin className="w-4 h-4 text-[#B79A62]" />
-          <span>Select Forecast Zone:</span>
+          <span>Switch to Any Supported District ({districts.length} available):</span>
         </div>
 
         <select
@@ -74,7 +202,7 @@ export const ForecastPage: React.FC = () => {
               setSelectedCoords({ lat: d.centroid_lat, lon: d.centroid_lon, name: d.name });
             }
           }}
-          className="text-xs p-2 rounded-md border border-gray-300 bg-white font-semibold text-gray-800 focus:ring-1 focus:ring-[#B79A62]"
+          className="text-xs p-2.5 rounded-md border border-gray-300 bg-white font-semibold text-gray-800 focus:ring-1 focus:ring-[#B79A62] max-w-sm"
         >
           {districts.map((d) => (
             <option key={d.code} value={d.name}>

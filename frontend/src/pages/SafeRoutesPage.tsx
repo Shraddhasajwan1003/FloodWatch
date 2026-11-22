@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { calculateRoutes, getNearbyFacilities, searchLocation } from '@/lib/api';
 import { RiskBadge } from '@/components/RiskBadge';
+import { RouteMapComponent } from '@/components/RouteMapComponent';
 import type { RoutesResponse, RouteOption, Facility, SearchResult } from '@/types';
 import {
   Compass,
@@ -216,6 +217,17 @@ export const SafeRoutesPage: React.FC = () => {
 
         {/* Right Column: Route Alternatives & Comparison */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Interactive Safe Route Map */}
+          <RouteMapComponent
+            origin={{ lat: originCoords.lat, lon: originCoords.lon, name: originText }}
+            destination={{ lat: destCoords.lat, lon: destCoords.lon, name: destText }}
+            routes={routeResult?.routes || []}
+            selectedRouteId={selectedRouteId}
+            onSelectRoute={(id) => setSelectedRouteId(id)}
+            facilities={facilities}
+            height="440px"
+          />
+
           {routeResult ? (
             <div className="space-y-5">
               {/* Route Preference Cards */}

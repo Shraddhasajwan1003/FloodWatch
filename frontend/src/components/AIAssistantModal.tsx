@@ -10,6 +10,7 @@ import {
   Activity,
   Compass,
 } from 'lucide-react';
+import { askAssistant } from '@/lib/api';
 
 interface AIAssistantModalProps {
   isOpen: boolean;
@@ -47,7 +48,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
     'What should I do if a road underpass is flooded?',
   ];
 
-  const handleSend = (textToSend?: string) => {
+  const handleSend = async (textToSend?: string) => {
     const query = (textToSend || input).trim();
     if (!query) return;
 
@@ -101,20 +102,30 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
       sourceTag = 'Platform Overview';
     }
 
-    setTimeout(() => {
+    try {
+      const response = await askAssistant(query);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: response.reply,
+          sourceTag: response.source_tag,
+        },
+      ]);
+    } catch {
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
           text: reply,
-          sourceTag,
+          sourceTag: `${sourceTag} (Gemini unavailable)`,
         },
       ]);
-    }, 400);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-xl h-[560px] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-[#101820] text-white p-4 flex items-center justify-between border-b border-gray-800">

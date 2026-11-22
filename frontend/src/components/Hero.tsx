@@ -36,7 +36,7 @@ export const Hero: React.FC<HeroProps> = ({ onCheckArea }) => {
           <p className="text-base sm:text-lg text-gray-300 leading-relaxed mb-8 max-w-2xl">
             {t(
               'hero.subtext',
-              'FloodWatch India combines weather forecasts, river telemetry, explainable terrain risk, and community-reported road hazards to help citizens and emergency teams make informed decisions during monsoon and flood events.'
+              'JalDrishti India combines weather forecasts, river telemetry, explainable terrain risk, and community-reported road hazards to help citizens and emergency teams make informed decisions during monsoon and flood events.'
             )}
           </p>
 

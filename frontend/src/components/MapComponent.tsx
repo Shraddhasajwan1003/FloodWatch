@@ -10,10 +10,18 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import { useQuery } from '@tanstack/react-query';
-import { getStates, getDistricts, getRiverStations, getNearbyReports, getNearbyFacilities } from '@/lib/api';
+import {
+  getStates,
+  getDistricts,
+  getRiverStations,
+  getNearbyReports,
+  getNearbyFacilities,
+  getAlerts,
+} from '@/lib/api';
 import { RISK_DISPLAY, formatRelativeTime } from '@/lib/risk';
 import { RiskBadge } from '@/components/RiskBadge';
-import type { RiskLevel, RiverStation, CommunityReport, Facility } from '@/types';
+import { DosAndDontsModal } from '@/components/DosAndDontsModal';
+import type { RiskLevel, RiverStation, CommunityReport, Facility, OfficialAlert } from '@/types';
 import {
   Layers,
   MapPin,
@@ -22,6 +30,12 @@ import {
   Hospital,
   Info,
   Maximize2,
+  Navigation,
+  ShieldAlert,
+  Zap,
+  Wind,
+  Flame,
+  Search,
 } from 'lucide-react';
 
 // Custom icons using Lucide SVGs encoded as Leaflet DivIcons
@@ -29,12 +43,12 @@ const createDivIcon = (color: string, label: string) => {
   return L.divIcon({
     className: 'custom-map-marker',
     html: `
-      <div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: bold;">
+      <div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: bold;">
         ${label}
       </div>
     `,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
   });
 };
 
@@ -42,6 +56,7 @@ interface MapComponentProps {
   onSelectDistrict?: (districtCode: string, name: string, lat: number, lon: number) => void;
   selectedCoords?: { lat: number; lon: number } | null;
   height?: string;
+  selectedHazard?: string;
 }
 
 // Controller to fly to coordinates when updated externally
@@ -69,6 +84,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   onSelectDistrict,
   selectedCoords,
   height = '620px',
+  selectedHazard = 'all',
 }) => {
   // Layer toggles
   const [layers, setLayers] = useState({
@@ -76,19 +92,28 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     rivers: true,
     reports: true,
     facilities: true,
+    alerts: true,
   });
 
-  const [inspectLocation, setInspectLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const [selectedStateCode, setSelectedStateCode] = useState<string>('');
+  const [selectedDistrictCode, setSelectedDistrictCode] = useState<string>('');
+  const [isLocating, setIsLocating] = useState<boolean>(false);
+  const [activeDndHazard, setActiveDndHazard] = useState<string | null>(null);
 
   // Queries for real backend data
+  const { data: states = [] } = useQuery({
+    queryKey: ['statesList'],
+    queryFn: () => getStates(),
+  });
+
   const { data: districts = [] } = useQuery({
-    queryKey: ['districts'],
-    queryFn: () => getDistricts(),
+    queryKey: ['districts', selectedStateCode],
+    queryFn: () => getDistricts(selectedStateCode || undefined),
   });
 
   const { data: rivers = [] } = useQuery({
-    queryKey: ['rivers'],
-    queryFn: () => getRiverStations(),
+    queryKey: ['rivers', selectedStateCode],
+    queryFn: () => getRiverStations(selectedStateCode || undefined),
   });
 
   const { data: reports = [] } = useQuery({
@@ -101,65 +126,159 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     queryFn: () => getNearbyFacilities(20.5937, 78.9629, 2000),
   });
 
+  const { data: alerts = [] } = useQuery({
+    queryKey: ['allAlertsMap', selectedHazard],
+    queryFn: () => getAlerts(undefined, selectedHazard),
+  });
+
   const toggleLayer = (layer: keyof typeof layers) => {
     setLayers((prev) => ({ ...prev, [layer]: !prev[layer] }));
   };
 
+  const handleStateChange = (stCode: string) => {
+    setSelectedStateCode(stCode);
+    setSelectedDistrictCode('');
+    const st = states.find((s) => s.code === stCode);
+    if (st && st.centroid_lat && st.centroid_lon && onSelectDistrict) {
+      onSelectDistrict(st.code, st.name, st.centroid_lat, st.centroid_lon);
+    }
+  };
+
+  const handleDistrictChange = (dCode: string) => {
+    setSelectedDistrictCode(dCode);
+    const d = districts.find((it) => it.code === dCode);
+    if (d && onSelectDistrict) {
+      onSelectDistrict(d.code, d.name, d.centroid_lat, d.centroid_lon);
+    }
+  };
+
+  const handleUseMyLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(4));
+        const lon = Number(pos.coords.longitude.toFixed(4));
+
+        // Find nearest district
+        let closest = districts[0];
+        let minDist = Infinity;
+        districts.forEach((d) => {
+          const dist = Math.hypot(d.centroid_lat - lat, d.centroid_lon - lon);
+          if (dist < minDist) {
+            minDist = dist;
+            closest = d;
+          }
+        });
+
+        if (closest && onSelectDistrict) {
+          onSelectDistrict(closest.code, `${closest.name} (My Location)`, lat, lon);
+        }
+        setIsLocating(false);
+      },
+      (err) => {
+        alert('Could not access GPS. Please check browser permissions.');
+        setIsLocating(false);
+      }
+    );
+  };
+
   const handleMapClick = (lat: number, lon: number) => {
-    setInspectLocation({ lat, lon });
     if (onSelectDistrict) {
-      onSelectDistrict('CUSTOM', `Location (${lat.toFixed(3)}, ${lon.toFixed(3)})`, lat, lon);
+      onSelectDistrict('CUSTOM', `Queried Location (${lat.toFixed(3)}, ${lon.toFixed(3)})`, lat, lon);
     }
   };
 
   return (
     <div className="relative rounded-xl overflow-hidden border border-gray-300 shadow-md bg-white">
-      {/* Top Map Toolbar & Layer Controls */}
-      <div className="absolute top-3 right-3 z-1000 bg-white/95 backdrop-blur-xs p-2.5 rounded-lg shadow-md border border-gray-200 text-xs flex flex-wrap items-center gap-2 max-w-sm sm:max-w-none">
-        <div className="flex items-center gap-1 font-bold text-gray-800 pr-2 border-r border-gray-200">
-          <Layers className="w-3.5 h-3.5 text-[#B79A62]" />
-          <span>Layers</span>
+      {/* Top Location Selection Bar (State -> District & GPS) */}
+      <div className="p-3 bg-white border-b border-gray-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* State selector */}
+          <select
+            value={selectedStateCode}
+            onChange={(e) => handleStateChange(e.target.value)}
+            className="p-1.5 rounded-lg border border-gray-300 bg-white font-semibold text-gray-800"
+          >
+            <option value="">All States / UTs ({states.length})</option>
+            {states.map((s) => (
+              <option key={s.code} value={s.code}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+
+          {/* District selector */}
+          <select
+            value={selectedDistrictCode}
+            onChange={(e) => handleDistrictChange(e.target.value)}
+            className="p-1.5 rounded-lg border border-gray-300 bg-white font-semibold text-gray-800 max-w-xs"
+          >
+            <option value="">Select District ({districts.length} covered)</option>
+            {districts.map((d) => (
+              <option key={d.code} value={d.code}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+
+          {/* GPS Button */}
+          <button
+            onClick={handleUseMyLocation}
+            disabled={isLocating}
+            className="px-3 py-1.5 rounded-lg bg-[#101820] hover:bg-gray-800 text-white font-bold flex items-center gap-1.5 transition-all shadow-xs"
+          >
+            <Navigation className={`w-3.5 h-3.5 text-[#B79A62] ${isLocating ? 'animate-spin' : ''}`} />
+            <span>{isLocating ? 'Locating...' : 'Use My GPS'}</span>
+          </button>
         </div>
 
-        <button
-          onClick={() => toggleLayer('risk')}
-          className={`px-2 py-1 rounded font-medium flex items-center gap-1 transition-colors ${
-            layers.risk ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-gray-100 text-gray-500'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-emerald-600" />
-          <span>Districts</span>
-        </button>
-
-        <button
-          onClick={() => toggleLayer('rivers')}
-          className={`px-2 py-1 rounded font-medium flex items-center gap-1 transition-colors ${
-            layers.rivers ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'bg-gray-100 text-gray-500'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-blue-600" />
-          <span>River Gauges</span>
-        </button>
-
-        <button
-          onClick={() => toggleLayer('reports')}
-          className={`px-2 py-1 rounded font-medium flex items-center gap-1 transition-colors ${
-            layers.reports ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-500'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-amber-600" />
-          <span>Road Hazards</span>
-        </button>
-
-        <button
-          onClick={() => toggleLayer('facilities')}
-          className={`px-2 py-1 rounded font-medium flex items-center gap-1 transition-colors ${
-            layers.facilities ? 'bg-red-100 text-red-800 border border-red-300' : 'bg-gray-100 text-gray-500'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-red-600" />
-          <span>Shelters/Hospitals</span>
-        </button>
+        {/* Layer Toggles */}
+        <div className="flex items-center gap-1.5 overflow-x-auto">
+          <button
+            onClick={() => toggleLayer('risk')}
+            className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
+              layers.risk ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-gray-100 text-gray-500'
+            }`}
+          >
+            Districts
+          </button>
+          <button
+            onClick={() => toggleLayer('alerts')}
+            className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
+              layers.alerts ? 'bg-red-100 text-red-800 border border-red-300' : 'bg-gray-100 text-gray-500'
+            }`}
+          >
+            Alerts ({alerts.length})
+          </button>
+          <button
+            onClick={() => toggleLayer('rivers')}
+            className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
+              layers.rivers ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'bg-gray-100 text-gray-500'
+            }`}
+          >
+            River Gauges
+          </button>
+          <button
+            onClick={() => toggleLayer('reports')}
+            className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
+              layers.reports ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-500'
+            }`}
+          >
+            Hazards
+          </button>
+          <button
+            onClick={() => toggleLayer('facilities')}
+            className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
+              layers.facilities ? 'bg-purple-100 text-purple-800 border border-purple-300' : 'bg-gray-100 text-gray-500'
+            }`}
+          >
+            Shelters
+          </button>
+        </div>
       </div>
 
       {/* Main Leaflet Map */}
@@ -196,75 +315,107 @@ export const MapComponent: React.FC<MapComponentProps> = ({
               }}
             >
               <Popup>
-                <div className="p-1 space-y-1 text-xs">
+                <div className="p-1 space-y-2 text-xs">
                   <div className="font-bold text-sm text-gray-900">{d.name}</div>
-                  <div className="text-gray-500">District Code: {d.code}</div>
-                  <div className="flex items-center gap-1.5 pt-1">
-                    <RiskBadge level="green" size="sm" score={15} />
-                    <span className="text-[10px] text-gray-500">Normal Range</span>
+                  <div className="text-[11px] text-gray-500 font-mono">
+                    {d.centroid_lat.toFixed(3)}°N, {d.centroid_lon.toFixed(3)}°E
                   </div>
-                  <div className="pt-2 border-t border-gray-100 text-[11px] text-gray-600">
-                    Click to load 24h rainfall & live river discharge.
-                  </div>
+                  <button
+                    onClick={() => {
+                      if (onSelectDistrict) {
+                        onSelectDistrict(d.code, d.name, d.centroid_lat, d.centroid_lon);
+                      }
+                    }}
+                    className="w-full py-1 rounded bg-[#101820] text-white text-[11px] font-bold"
+                  >
+                    View Local Risk & Forecast
+                  </button>
                 </div>
               </Popup>
             </Marker>
           ))}
 
-        {/* River Gauging Stations */}
+        {/* Multi-Hazard Official Alerts Layer */}
+        {layers.alerts &&
+          alerts.map((alt) => {
+            // Assign coordinate based on district/state or defaults
+            const isCyclone = alt.hazard_type === 'cyclone';
+            const isThunder = alt.hazard_type === 'thunderstorm';
+            const color = alt.severity === 'extreme' ? '#DC2626' : alt.severity === 'severe' ? '#EA580C' : '#CA8A04';
+            const symbol = isCyclone ? '🌀' : isThunder ? '⚡' : '⚠️';
+
+            // Use a representative location until alert coordinates are exposed by the API.
+            const pos: [number, number] = [
+              isCyclone ? 20.2644 : isThunder ? 26.1445 : 28.6139,
+              isCyclone ? 86.6710 : isThunder ? 91.7362 : 77.2090,
+            ];
+
+            return (
+              <Marker
+                key={`alert-${alt.id || alt.alert_id}`}
+                position={pos}
+                icon={createDivIcon(color, symbol)}
+              >
+                <Popup>
+                  <div className="p-1 space-y-2 text-xs max-w-[240px]">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-100 text-red-800">
+                        {alt.hazard_type || 'Disaster Alert'}
+                      </span>
+                      <span className="text-[10px] uppercase font-bold text-gray-500">{alt.severity}</span>
+                    </div>
+                    <div className="font-bold text-gray-900 leading-snug">{alt.headline}</div>
+                    <p className="text-[11px] text-gray-600 line-clamp-3">{alt.description}</p>
+                    <button
+                      onClick={() => setActiveDndHazard(alt.hazard_type || 'flood')}
+                      className="w-full py-1 rounded bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold uppercase tracking-wider"
+                    >
+                      View NDMA Dos and Don'ts
+                    </button>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+
+        {/* River Stations Layer */}
         {layers.rivers &&
           rivers.map((r) => (
             <Marker
               key={`river-${r.station_code}`}
               position={[r.lat, r.lon]}
-              icon={createDivIcon('#2563EB', 'R')}
+              icon={createDivIcon('#0284C7', 'R')}
             >
               <Popup>
-                <div className="p-1 space-y-1.5 text-xs">
-                  <div className="font-bold text-sm text-blue-900 flex items-center gap-1">
-                    <Activity className="w-3.5 h-3.5" />
-                    <span>{r.name}</span>
-                  </div>
-                  <div className="text-gray-600">River: <strong>{r.river_name}</strong></div>
-                  <div className="text-gray-500 font-mono text-[11px]">
-                    Lat: {r.lat.toFixed(3)}, Lon: {r.lon.toFixed(3)}
-                  </div>
-                  <div className="p-1.5 rounded bg-blue-50 border border-blue-200 text-[11px] text-blue-800">
-                    Source: GloFAS / Open-Meteo telemetry model.
-                  </div>
+                <div className="p-1 space-y-1 text-xs">
+                  <div className="font-bold text-sm text-gray-900">{r.name}</div>
+                  <div className="text-gray-600">River: {r.river_name}</div>
+                  {r.warning_level_m && (
+                    <div className="text-amber-700 font-semibold text-[11px]">Warning: {r.warning_level_m} m</div>
+                  )}
+                  {r.danger_level_m && (
+                    <div className="text-red-700 font-semibold text-[11px]">Danger: {r.danger_level_m} m</div>
+                  )}
                 </div>
               </Popup>
             </Marker>
           ))}
 
-        {/* Community Hazards / Road Blocks */}
+        {/* Community Hazards Layer */}
         {layers.reports &&
           reports.map((rep) => (
             <Marker
               key={`rep-${rep.id}`}
               position={[rep.lat, rep.lon]}
-              icon={createDivIcon('#EA580C', '!')}
+              icon={createDivIcon('#F59E0B', '!')}
             >
               <Popup>
-                <div className="p-1 space-y-1.5 text-xs">
-                  <div className="font-bold text-amber-900 flex items-center gap-1">
-                    <AlertTriangle className="w-3.5 h-3.5 text-orange-600" />
-                    <span className="uppercase">{rep.category.replace('_', ' ')}</span>
-                  </div>
+                <div className="p-1 space-y-1 text-xs">
+                  <div className="font-bold text-amber-900 uppercase">{rep.category.replace('_', ' ')}</div>
                   <p className="text-gray-700">{rep.description}</p>
                   {rep.water_depth_cm && (
-                    <div className="text-xs text-red-700 font-semibold">
-                      Estimated Water Depth: ~{rep.water_depth_cm} cm
-                    </div>
+                    <div className="text-red-700 font-semibold text-[11px]">Water Depth: ~{rep.water_depth_cm} cm</div>
                   )}
-                  {rep.road_blocked && (
-                    <div className="px-2 py-0.5 rounded bg-red-100 text-red-800 font-bold text-[10px] inline-block">
-                      ROAD BLOCKED
-                    </div>
-                  )}
-                  <div className="text-[10px] text-gray-500 pt-1">
-                    Reported {formatRelativeTime(rep.submitted_at)} • Status: {rep.status}
-                  </div>
                 </div>
               </Popup>
             </Marker>
@@ -276,26 +427,14 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             <Marker
               key={`fac-${f.id}`}
               position={[f.lat, f.lon]}
-              icon={createDivIcon('#DC2626', 'H')}
+              icon={createDivIcon('#7C3AED', f.facility_type === 'hospital' ? 'H' : 'S')}
             >
               <Popup>
-                <div className="p-1 space-y-1.5 text-xs">
-                  <div className="font-bold text-gray-900 flex items-center gap-1">
-                    <Hospital className="w-3.5 h-3.5 text-red-600" />
-                    <span>{f.name}</span>
-                  </div>
-                  <div className="text-gray-600">{f.address || 'Address on record'}</div>
-                  {f.phone && <div className="text-gray-700">Phone: {f.phone}</div>}
-                  <div className="flex items-center gap-2 pt-1">
-                    <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-[10px] font-semibold uppercase">
-                      {f.facility_type}
-                    </span>
-                    {f.is_verified && (
-                      <span className="px-2 py-0.5 rounded bg-green-100 text-green-800 text-[10px] font-semibold">
-                        Verified Facility
-                      </span>
-                    )}
-                  </div>
+                <div className="p-1 space-y-1 text-xs">
+                  <div className="font-bold text-gray-900">{f.name}</div>
+                  <div className="text-gray-600 text-[11px]">{f.address}</div>
+                  {f.phone && <div className="text-blue-700 font-bold font-mono text-[11px]">📞 {f.phone}</div>}
+                  <div className="text-[10px] text-gray-500 uppercase">{f.facility_type}</div>
                 </div>
               </Popup>
             </Marker>
@@ -317,35 +456,36 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           <span className="font-bold text-gray-800">Legend:</span>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-emerald-600" />
-            <span>Below Warning</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-yellow-400" />
-            <span>Watch</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-orange-500" />
-            <span>High Risk</span>
+            <span>District (D)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-red-600" />
-            <span>Severe Risk</span>
+            <span>Disaster Alert (!)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-blue-600" />
-            <span>River Gauge</span>
+            <span>River Gauge (R)</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-red-700" />
-            <span>Hospital/Shelter</span>
+            <span className="w-3 h-3 rounded-full bg-purple-600" />
+            <span>Shelter / Hospital (S/H)</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 text-[11px] text-gray-700">
+        <div className="flex items-center gap-1 text-[11px] text-gray-500">
           <Info className="w-3.5 h-3.5" />
-          <span>Click anywhere on map to query coordinates</span>
+          <span>Click anywhere to inspect coordinates or query local risks</span>
         </div>
       </div>
+
+      {/* Dos and Don'ts Modal */}
+      {activeDndHazard && (
+        <DosAndDontsModal
+          isOpen={!!activeDndHazard}
+          onClose={() => setActiveDndHazard(null)}
+          defaultHazard={activeDndHazard}
+        />
+      )}
     </div>
   );
 };

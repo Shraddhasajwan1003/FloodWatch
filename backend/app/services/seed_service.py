@@ -2,6 +2,7 @@
 FloodWatch India — Database Seed Service
 Populates reference administrative data (States, Districts, River Stations, Data Sources, Facilities)
 """
+import json
 import logging
 from datetime import datetime, timezone
 from sqlalchemy import select
@@ -14,7 +15,15 @@ from app.models.models import (
     DataSource,
     Facility,
     FacilityType,
+    RescueRequest,
+    RescueStatus,
+    OfficialAlert,
+    AlertSeverity,
+    User,
+    UserRole,
 )
+from app.services.auth_service import hash_password
+from app.api.v1.alerts import OFFICIAL_DOS_AND_DONTS
 from app.core.india_reference_data import (
     INDIAN_STATES,
     MONITORED_DISTRICTS,
@@ -191,6 +200,266 @@ INITIAL_FACILITIES = [
         "is_operational": True,
         "source": "Kerala State Disaster Management Authority",
     },
+    # Coastal Odisha Shelters
+    {
+        "name": "Paradip Port Disaster Evacuation Shelter & Cyclone Center",
+        "facility_type": FacilityType.SHELTER,
+        "lat": 20.2644,
+        "lon": 86.6710,
+        "address": "Port Township Sector 21, Paradip, Jagatsinghpur, Odisha",
+        "phone": "+91-6722-222034",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "OSDMA Multipurpose Cyclone Shelter Network",
+    },
+    {
+        "name": "Puri Coastal Multi-Hazard Cyclone Shelter",
+        "facility_type": FacilityType.SHELTER,
+        "lat": 19.8135,
+        "lon": 85.8312,
+        "address": "Chakratirtha Road, Puri Beach Coast, Odisha",
+        "phone": "+91-6752-222034",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "OSDMA Coastal Shelter Registry",
+    },
+    # West Bengal Coastal Shelters
+    {
+        "name": "Digha Coastal Multipurpose Evacuation Shelter",
+        "facility_type": FacilityType.SHELTER,
+        "lat": 21.6266,
+        "lon": 87.5074,
+        "address": "Near Old Digha Sea Beach, Purba Medinipur, West Bengal",
+        "phone": "1077",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "West Bengal Disaster Management Department",
+    },
+    {
+        "name": "Sundarbans Delta Flood Relief Camp (Gosaba)",
+        "facility_type": FacilityType.RELIEF_CAMP,
+        "lat": 22.1352,
+        "lon": 88.5432,
+        "address": "Gosaba Block Headquarters, South 24 Parganas, West Bengal",
+        "phone": "+91-3218-236224",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "Sundarbans Affairs Department",
+    },
+    # Andhra Pradesh Shelters
+    {
+        "name": "Visakhapatnam Harbor Coastal Evacuation Shelter",
+        "facility_type": FacilityType.SHELTER,
+        "lat": 17.6868,
+        "lon": 83.2185,
+        "address": "Fishing Harbor Road, Port Area, Visakhapatnam, AP",
+        "phone": "+91-891-2564891",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "APSDMA Coastal Hazard Cell",
+    },
+    {
+        "name": "Kakinada Hope Island Fishermen Relief Shelter",
+        "facility_type": FacilityType.SHELTER,
+        "lat": 16.9891,
+        "lon": 82.2475,
+        "address": "Port Road, Kakinada, Andhra Pradesh",
+        "phone": "+91-884-2361077",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "APSDMA Cyclone Relief Unit",
+    },
+    # Tamil Nadu Coastal Shelters
+    {
+        "name": "Kasimedu Fishermen Evacuation & Relief Center Chennai",
+        "facility_type": FacilityType.RELIEF_CAMP,
+        "lat": 13.1250,
+        "lon": 80.2980,
+        "address": "Fishing Harbor Complex, Kasimedu, Royapuram, Chennai",
+        "phone": "+91-44-25983411",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "Greater Chennai Corporation Disaster Cell",
+    },
+    {
+        "name": "Nagapattinam Tsunami & Cyclone Multi-Hazard Shelter",
+        "facility_type": FacilityType.SHELTER,
+        "lat": 10.7656,
+        "lon": 79.8424,
+        "address": "Keechankuppam Coastal Hamlet, Nagapattinam, Tamil Nadu",
+        "phone": "1077",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "TNDRRA Coastal Disaster Registry",
+    },
+    {
+        "name": "Kanyakumari Cape Coastal Relief & Rescue Center",
+        "facility_type": FacilityType.SHELTER,
+        "lat": 8.0883,
+        "lon": 77.5385,
+        "address": "Near Government High School, Beach Road, Kanyakumari",
+        "phone": "+91-4652-246222",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "District Disaster Management Authority Kanyakumari",
+    },
+    # Karnataka & Goa Coastal Shelters
+    {
+        "name": "Malpe Port Coastal Disaster Shelter (Udupi)",
+        "facility_type": FacilityType.SHELTER,
+        "lat": 13.3512,
+        "lon": 74.7015,
+        "address": "Fisheries Harbor Complex, Malpe, Udupi, Karnataka",
+        "phone": "+91-820-2520333",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "Karnataka State Natural Disaster Monitoring Centre",
+    },
+    {
+        "name": "Mangaluru Coastal Marine Police & Rescue Station",
+        "facility_type": FacilityType.RELIEF_CAMP,
+        "lat": 12.8580,
+        "lon": 74.8360,
+        "address": "Old Bunder, Port Area, Mangaluru, Karnataka",
+        "phone": "+91-824-2420100",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "Dakshina Kannada District Administration",
+    },
+    {
+        "name": "Mormugao Port Disaster Evacuation Hall (Goa)",
+        "facility_type": FacilityType.SHELTER,
+        "lat": 15.4167,
+        "lon": 73.8000,
+        "address": "Headland Sada, Mormugao, South Goa 403804",
+        "phone": "+91-832-2521100",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "Goa State Disaster Management Authority",
+    },
+    # Maharashtra Coastal Shelters
+    {
+        "name": "Ratnagiri Mirkarwada Coastal Shelter",
+        "facility_type": FacilityType.SHELTER,
+        "lat": 16.9902,
+        "lon": 73.2800,
+        "address": "Near Mirkarwada Jetty, Ratnagiri, Maharashtra",
+        "phone": "+91-2352-222340",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "Maharashtra State Disaster Management Unit",
+    },
+    # Gujarat Coastal Shelters
+    {
+        "name": "Porbandar Marine Evacuation & Cyclone Relief Center",
+        "facility_type": FacilityType.SHELTER,
+        "lat": 21.6417,
+        "lon": 69.6000,
+        "address": "Subhash Nagar Coastal Colony, Porbandar, Gujarat",
+        "phone": "+91-286-2244100",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "GSDMA Coastal Disaster Registry",
+    },
+    # Gangetic Riverine Shelters
+    {
+        "name": "Varanasi Assi Ghat Flood Evacuation Shelter",
+        "facility_type": FacilityType.RELIEF_CAMP,
+        "lat": 25.3000,
+        "lon": 83.0000,
+        "address": "Assi Ghat Community Center, Varanasi, UP",
+        "phone": "+91-542-2221234",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "Varanasi District Disaster Authority",
+    },
+    # Himalayan Basin Shelters
+    {
+        "name": "Haridwar Ganga Basin Disaster Evacuation Shelter",
+        "facility_type": FacilityType.SHELTER,
+        "lat": 29.9457,
+        "lon": 78.1642,
+        "address": "Bairagi Camp, Near Ganga Canal, Haridwar, Uttarakhand",
+        "phone": "+91-1334-226500",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "Uttarakhand State Disaster Management Authority",
+    },
+    {
+        "name": "Srinagar Jhelum Flood Spillway Evacuation Center",
+        "facility_type": FacilityType.SHELTER,
+        "lat": 34.0837,
+        "lon": 74.7973,
+        "address": "Ram Munshi Bagh, Sonwar, Srinagar, J&K",
+        "phone": "+91-194-2452100",
+        "is_verified": True,
+        "is_operational": True,
+        "source": "J&K Disaster Management Authority",
+    },
+]
+
+INITIAL_RESCUE_REQUESTS = [
+    {
+        "contact_name": "Ramesh Chandra Das",
+        "phone": "+91-98640-12345",
+        "lat": 26.1820,
+        "lon": 91.7450,
+        "address_landmark": "Near Bharalu river sluice gate, Kumarpara, Guwahati",
+        "people_count": 4,
+        "has_infants_or_elderly": True,
+        "medical_emergency_notes": "Diabetic elderly grandmother requires insulin refrigeration; water waist-deep on ground floor",
+        "water_level_stage": "waist",
+        "status": RescueStatus.NEEDS_RESCUE,
+        "ai_trust_score": 96.0,
+        "ai_flags_json": json.dumps(["Critical vulnerability: Elderly/Infant present", "Consistent with Bharalu sluice overflow"]),
+    },
+    {
+        "contact_name": "Ananya Sharma",
+        "phone": "+91-98101-56789",
+        "lat": 28.6690,
+        "lon": 77.2380,
+        "address_landmark": "Monastery Market, Ring Road, Yamuna Bazar, Civil Lines, Delhi",
+        "people_count": 6,
+        "has_infants_or_elderly": False,
+        "medical_emergency_notes": "Stranded on temple rooftop; safe from current but low on drinking water",
+        "water_level_stage": "chest",
+        "status": RescueStatus.IN_PROGRESS,
+        "rescued_by": "NDRF 8th Battalion Boat Unit 2",
+        "rescue_notes": "Motorboat en route from Kashmere Gate ISBT point",
+        "ai_trust_score": 94.0,
+        "ai_flags_json": json.dumps(["High priority dispatch", "Yamuna high flood level corridor"]),
+    },
+    {
+        "contact_name": "Sunil Varghese",
+        "phone": "+91-94470-34567",
+        "lat": 10.1150,
+        "lon": 76.3580,
+        "address_landmark": "Opposite Aluva Mahadeva Temple Bank, Aluva, Ernakulam",
+        "people_count": 3,
+        "has_infants_or_elderly": True,
+        "medical_emergency_notes": None,
+        "water_level_stage": "knee",
+        "status": RescueStatus.RESCUED,
+        "rescued_by": "Kerala Fire & Rescue Volunteers",
+        "rescue_notes": "Evacuated safely to Aluva Municipal Town Hall Shelter",
+        "ai_trust_score": 98.0,
+        "ai_flags_json": json.dumps(["Evacuation completed successfully"]),
+    },
+    {
+        "contact_name": "Pooja Kumari",
+        "phone": "+91-93340-98765",
+        "lat": 25.6180,
+        "lon": 85.1620,
+        "address_landmark": "Near Patna College Ghat, Ashok Rajpath, Patna",
+        "people_count": 2,
+        "has_infants_or_elderly": False,
+        "medical_emergency_notes": None,
+        "water_level_stage": "ankle",
+        "status": RescueStatus.SAFE,
+        "rescue_notes": "Water receded from lane; family secured on 2nd floor with rations",
+        "ai_trust_score": 91.0,
+        "ai_flags_json": json.dumps(["Marked safe by resident"]),
+    },
 ]
 
 async def seed_reference_data(session: AsyncSession) -> None:
@@ -297,6 +566,154 @@ async def seed_reference_data(session: AsyncSession) -> None:
                     last_verified_at=datetime.now(timezone.utc),
                 )
                 session.add(fac_obj)
+
+        # 6. Seed Community Rescue Status Requests
+        for req in INITIAL_RESCUE_REQUESTS:
+            stmt = select(RescueRequest).where(RescueRequest.contact_name == req["contact_name"])
+            res = await session.execute(stmt)
+            existing = res.scalar_one_or_none()
+            if not existing:
+                rescue_obj = RescueRequest(
+                    contact_name=req["contact_name"],
+                    phone=req["phone"],
+                    lat=req["lat"],
+                    lon=req["lon"],
+                    address_landmark=req["address_landmark"],
+                    people_count=req["people_count"],
+                    has_infants_or_elderly=req["has_infants_or_elderly"],
+                    medical_emergency_notes=req.get("medical_emergency_notes"),
+                    water_level_stage=req["water_level_stage"],
+                    status=req["status"],
+                    rescued_by=req.get("rescued_by"),
+                    rescue_notes=req.get("rescue_notes"),
+                    ai_trust_score=req.get("ai_trust_score", 95.0),
+                    ai_flags_json=req.get("ai_flags_json"),
+                )
+                session.add(rescue_obj)
+
+        # 7. Seed Multi-Hazard Alerts
+        INITIAL_ALERTS = [
+            {
+                "alert_id": "IMD-SACHET-2026-CY-01",
+                "source_id": "ndma-sachet",
+                "issuer": "IMD Cyclone Warning Centre",
+                "severity": AlertSeverity.SEVERE,
+                "hazard_type": "cyclone",
+                "headline": "Cyclone Warning: Deep Depression Approaching Odisha & North Andhra Coast",
+                "description": "Squally winds 65-75 km/h gusting to 85 km/h likely along and off Odisha and North Andhra Pradesh coasts. Sea condition rough to very rough.",
+                "area_description": "Puri, Jagatsinghpur (Paradip), Ganjam, Srikakulam and Visakhapatnam coastal districts.",
+                "dos_and_donts_json": json.dumps(OFFICIAL_DOS_AND_DONTS["cyclone"]),
+            },
+            {
+                "alert_id": "IMD-SACHET-2026-TS-02",
+                "source_id": "ndma-sachet",
+                "issuer": "IMD Regional Meteorological Centre Guwahati",
+                "severity": AlertSeverity.WARNING,
+                "hazard_type": "thunderstorm",
+                "headline": "Severe Thunderstorm, Cloud-to-Ground Lightning & Squall Warning",
+                "description": "Thunderstorms accompanied by lightning, hail, and gusty winds (40-50 km/h) very likely over Kamrup, Jorhat, Dibrugarh, and neighboring districts.",
+                "area_description": "Brahmaputra Valley districts and lower Assam.",
+                "dos_and_donts_json": json.dumps(OFFICIAL_DOS_AND_DONTS["thunderstorm"]),
+            },
+            {
+                "alert_id": "DDMA-SACHET-2026-FL-03",
+                "source_id": "ndma-sachet",
+                "issuer": "Delhi Disaster Management Authority (DDMA)",
+                "severity": AlertSeverity.WARNING,
+                "hazard_type": "flood",
+                "headline": "Yamuna River Water Level Escalation Alert (Near Warning Level 204.5m)",
+                "description": "Hathnikund barrage release of 1.65 lakh cusecs expected to reach Delhi in 48 hours. Floodplain residents instructed to evacuate to relief camps.",
+                "area_description": "Yamuna Bazar, Monastery Market, Geeta Colony and Ring Road low-lying segments.",
+                "dos_and_donts_json": json.dumps(OFFICIAL_DOS_AND_DONTS["flood"]),
+            },
+            {
+                "alert_id": "SDMA-SACHET-2026-FL-04",
+                "source_id": "ndma-sachet",
+                "issuer": "Uttarakhand State Emergency Operation Centre",
+                "severity": AlertSeverity.EXTREME,
+                "hazard_type": "flood",
+                "headline": "Cloudburst & Flash Flood Red Alert for Alaknanda Basin",
+                "description": "Intense torrential cloudburst triggering flash floods and landslides along Chamoli and Haridwar upstream river corridors.",
+                "area_description": "Chamoli, Rudraprayag, and downstream Haridwar Ganga ghats.",
+                "dos_and_donts_json": json.dumps(OFFICIAL_DOS_AND_DONTS["flood"]),
+            },
+            {
+                "alert_id": "NDMA-SACHET-2026-EQ-05",
+                "source_id": "ndma-sachet",
+                "issuer": "National Centre for Seismology (NCS)",
+                "severity": AlertSeverity.WATCH,
+                "hazard_type": "earthquake",
+                "headline": "Seismic Tremor Watch (M 4.2) for Kashmir Valley Corridor",
+                "description": "Shallow seismic activity detected. Citizens advised to follow Drop, Cover & Hold protocol in case of aftershocks.",
+                "area_description": "Srinagar, Baramulla, and Budgam districts.",
+                "dos_and_donts_json": json.dumps(OFFICIAL_DOS_AND_DONTS["earthquake"]),
+            },
+            {
+                "alert_id": "NDMA-SACHET-2026-FR-06",
+                "source_id": "ndma-sachet",
+                "issuer": "State Disaster Management Authority Maharashtra",
+                "severity": AlertSeverity.WARNING,
+                "hazard_type": "fire",
+                "headline": "Industrial Electrical Fire & Urban Heat Surge Precautionary Advisory",
+                "description": "High ambient temperature with transformer overload risk in dense commercial clusters.",
+                "area_description": "Mumbai Suburban and Thane commercial industrial sectors.",
+                "dos_and_donts_json": json.dumps(OFFICIAL_DOS_AND_DONTS["fire"]),
+            },
+        ]
+        for alt in INITIAL_ALERTS:
+            stmt = select(OfficialAlert).where(OfficialAlert.alert_id == alt["alert_id"])
+            res = await session.execute(stmt)
+            existing = res.scalar_one_or_none()
+            if not existing:
+                a_obj = OfficialAlert(
+                    alert_id=alt["alert_id"],
+                    source_id=alt["source_id"],
+                    issuer=alt["issuer"],
+                    severity=alt["severity"],
+                    hazard_type=alt.get("hazard_type", "flood"),
+                    headline=alt["headline"],
+                    description=alt["description"],
+                    area_description=alt["area_description"],
+                    dos_and_donts_json=alt.get("dos_and_donts_json"),
+                    effective_at=datetime.now(timezone.utc),
+                    retrieved_at=datetime.now(timezone.utc),
+                    is_active=True,
+                )
+                session.add(a_obj)
+
+        # 8. Seed Default User & Admin Accounts
+        INITIAL_USERS = [
+            {
+                "email": "admin@jaldrishti.gov.in",
+                "password": "Admin@123",
+                "full_name": "NDRF Disaster Control Commander",
+                "phone": "+91-11-24363260",
+                "role": UserRole.ADMIN,
+                "district_code": "DL-NDL",
+            },
+            {
+                "email": "citizen@jaldrishti.gov.in",
+                "password": "Citizen@123",
+                "full_name": "Rohan Mehra",
+                "phone": "+91-98765-43210",
+                "role": UserRole.CITIZEN,
+                "district_code": "OD-PAR",
+            },
+        ]
+        for u in INITIAL_USERS:
+            stmt = select(User).where(User.email == u["email"])
+            res = await session.execute(stmt)
+            existing = res.scalar_one_or_none()
+            if not existing:
+                user_obj = User(
+                    email=u["email"],
+                    hashed_password=hash_password(u["password"]),
+                    full_name=u["full_name"],
+                    phone=u.get("phone"),
+                    role=u["role"],
+                    district_code=u.get("district_code"),
+                )
+                session.add(user_obj)
 
         await session.commit()
         logger.info("Database seeding completed successfully.")

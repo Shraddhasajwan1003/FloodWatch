@@ -13,10 +13,10 @@ export const Footer: React.FC = () => {
               <div className="w-7 h-7 rounded bg-[#263746] flex items-center justify-center text-[#B79A62]">
                 <Waves className="w-4 h-4" />
               </div>
-              <span>FloodWatch <span className="text-[#B79A62]">India</span></span>
+              <span>JalDrishti <span className="text-[#B79A62]">India</span></span>
             </div>
             <p className="text-gray-400 text-xs leading-relaxed">
-              National flood intelligence and emergency safe-route decision-support platform. Bringing together weather forecasts, river telemetry, and road hazard observations across Indian states.
+              National flood intelligence, emergency safe-route & community rescue coordination platform. Bringing together weather forecasts, river telemetry, and road hazard observations across Indian states.
             </p>
             <div className="text-[11px] text-[#B79A62] font-semibold flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5" />
@@ -79,7 +79,7 @@ export const Footer: React.FC = () => {
         {/* Bottom Disclaimer bar */}
         <div className="pt-6 border-t border-gray-800 text-[11px] text-gray-500 flex flex-wrap items-center justify-between gap-4">
           <p>
-            © {new Date().getFullYear()} FloodWatch India. Built as a civic decision-support platform. Not an official replacement for statutory government warnings or emergency response authorities.
+            © {new Date().getFullYear()} JalDrishti India. Built as a civic decision-support platform. Not an official replacement for statutory government warnings or emergency response authorities.
           </p>
           <div className="flex items-center gap-4 text-gray-400">
             <span>Privacy-aware Geolocation</span>

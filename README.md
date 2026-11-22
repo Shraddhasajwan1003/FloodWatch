@@ -75,7 +75,18 @@ Backend (FastAPI + Python 3.11 + Pydantic v2 + SQLAlchemy 2.0 Async + SQLite/Pos
 - Python 3.11+
 - Node.js 18+ and npm
 
-### 1. Start the Backend API
+### 1. Generate local environment files
+
+From the repository root, run:
+```powershell
+python scripts/setup_env.py
+```
+This creates `backend/.env` and `frontend/.env.local` from the committed
+templates. A random backend `SECRET_KEY` is generated automatically. Existing
+environment files are kept unchanged, and generated files are excluded from Git.
+The defaults use SQLite locally and need no external API keys.
+
+### 2. Start the Backend API
 Open a terminal in `D:\Flood\backend`:
 ```powershell
 # Navigate to backend
@@ -89,7 +100,7 @@ The backend will:
 - Seed reference administrative data (all 36 Indian states/UTs, monitored districts, river stations, initial data sources, and verified hospitals)
 - Serve interactive OpenAPI docs at: **http://127.0.0.1:8000/api/docs**
 
-### 2. Start the Frontend
+### 3. Start the Frontend
 Open a second terminal in `D:\Flood\frontend`:
 ```powershell
 # Navigate to frontend
@@ -99,6 +110,13 @@ cd D:\Flood\frontend
 npm run dev
 ```
 Open your browser at: **http://localhost:5173**
+
+To customize settings, edit `backend/.env` for the API or
+`frontend/.env.local` for Vite. For Vercel and Render, configure production
+environment variables in their dashboards rather than committing local `.env`
+files. See the production deployment section below.
+To enable the Gemini-backed assistant, set `GEMINI_API_KEY` in `backend/.env`;
+the key stays server-side and should not be added as a `VITE_` variable.
 
 ---
 
@@ -136,6 +154,7 @@ Add these environment variables to the web service:
 | `ALLOWED_ORIGINS` | JSON array of the Vercel site origins, e.g. `["https://your-app.vercel.app"]` |
 | `DEBUG` | `false` |
 | `SECRET_KEY` | A unique random secret; generate locally with `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
+| `GEMINI_API_KEY` | Optional Google Gemini key for the assistant; keep this only in the backend environment |
 
 If you use a custom Vercel domain, include that exact origin in `ALLOWED_ORIGINS`
 as well. Origins must include `https://` and must not have a trailing slash.

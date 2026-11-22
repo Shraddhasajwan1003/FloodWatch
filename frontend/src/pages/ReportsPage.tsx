@@ -16,9 +16,22 @@ import {
   Loader2,
 } from 'lucide-react';
 
+type DisasterFilter = 'all' | 'flooding' | 'landslide' | 'cyclone' | 'fire';
+
+const DISASTER_FILTER_CHIPS: { value: DisasterFilter; label: string }[] = [
+  { value: 'all',       label: 'All Types' },
+  { value: 'flooding',  label: '🌊 Flooding' },
+  { value: 'landslide', label: '⛰️ Landslide' },
+  { value: 'cyclone',   label: '🌀 Cyclone' },
+  { value: 'fire',      label: '🔥 Fire' },
+];
+
+const FLOODING_CATEGORIES = ['waterlogging', 'road_blocked', 'bridge_damage', 'basement_flooding', 'drain_overflow'];
+
 export const ReportsPage: React.FC = () => {
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterType, setFilterType] = useState<DisasterFilter>('all');
 
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ['allCommunityReports'],
@@ -26,8 +39,13 @@ export const ReportsPage: React.FC = () => {
   });
 
   const filteredReports = reports.filter((r) => {
-    if (filterStatus === 'all') return true;
-    return r.status.toLowerCase() === filterStatus.toLowerCase();
+    const statusMatch = filterStatus === 'all' || r.status.toLowerCase() === filterStatus.toLowerCase();
+    let typeMatch = true;
+    if (filterType === 'flooding') typeMatch = FLOODING_CATEGORIES.includes(r.category);
+    else if (filterType === 'landslide') typeMatch = r.category === 'landslide';
+    else if (filterType === 'cyclone') typeMatch = r.category === 'cyclone_damage';
+    else if (filterType === 'fire') typeMatch = r.category === 'fire_flood';
+    return statusMatch && typeMatch;
   });
 
   const getStatusBadge = (status: string) => {
@@ -66,10 +84,10 @@ export const ReportsPage: React.FC = () => {
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mt-1 flex items-center gap-2">
             <AlertTriangle className="w-7 h-7 text-orange-600" />
-            <span>Community Waterlogging & Road Incident Reports</span>
+            <span>Community Disaster Reports</span>
           </h1>
           <p className="text-xs sm:text-sm text-gray-600 max-w-2xl mt-1">
-            Reports submitted by motorists, citizens, and emergency volunteers. Helps identify street inundation hotspots ahead of official updates.
+            Citizen-submitted reports of floods, landslides, cyclone damage, and other hazards. GPS-verified, camera-captured reports are marked with a 📍 badge.
           </p>
         </div>
 
@@ -78,7 +96,7 @@ export const ReportsPage: React.FC = () => {
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-[#B79A62] hover:bg-[#a68953] text-[#101820] text-xs font-bold uppercase tracking-wider shadow-sm transition-all active:scale-98"
         >
           <Plus className="w-4 h-4 text-[#101820]" />
-          <span>Report New Hazard</span>
+          <span>Report a Disaster</span>
         </button>
       </div>
 
@@ -90,7 +108,25 @@ export const ReportsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Disaster Type Filter Chips */}
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="font-semibold text-gray-500 mr-1">Disaster Type:</span>
+        {DISASTER_FILTER_CHIPS.map((chip) => (
+          <button
+            key={chip.value}
+            onClick={() => setFilterType(chip.value)}
+            className={`px-3 py-1 rounded-full font-semibold transition-colors ${
+              filterType === chip.value
+                ? 'bg-[#101820] text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Status Filter Tabs */}
       <div className="flex items-center gap-2 border-b border-gray-200 pb-2 text-xs">
         <span className="font-semibold text-gray-500 mr-2">Filter Status:</span>
         {['all', 'unverified', 'verified', 'corroborated'].map((st) => (
@@ -119,7 +155,7 @@ export const ReportsPage: React.FC = () => {
           <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
           <h3 className="text-sm font-bold text-gray-800">No active incidents match this filter</h3>
           <p className="text-gray-400">
-            If you encounter flooded streets or impassable underpasses, click "Report New Hazard".
+            If you encounter a disaster or hazard, click "Report a Disaster".
           </p>
         </div>
       ) : (
@@ -132,7 +168,7 @@ export const ReportsPage: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <span className="text-xs font-bold uppercase tracking-wider text-orange-700 bg-orange-50 px-2 py-0.5 rounded border border-orange-100">
-                    {r.category.replace('_', ' ')}
+                    {r.category.replace(/_/g, ' ')}
                   </span>
                   {getStatusBadge(r.status)}
                 </div>
@@ -151,6 +187,14 @@ export const ReportsPage: React.FC = () => {
                 {r.water_depth_cm && (
                   <div className="text-xs text-gray-600">
                     Reported Depth: <strong className="text-gray-900">~{r.water_depth_cm} cm</strong>
+                  </div>
+                )}
+
+                {/* GPS badge */}
+                {r.lat && r.lon && (
+                  <div className="mt-1 text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    <span>📍 GPS-verified</span>
                   </div>
                 )}
               </div>

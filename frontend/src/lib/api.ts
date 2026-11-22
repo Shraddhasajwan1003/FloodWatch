@@ -19,6 +19,15 @@ import type {
   IndianState,
   District,
   SearchResult,
+  RescueRequest,
+  RescueStatistics,
+  RescueStatus,
+  MarineConditions,
+  CoastalFishingZone,
+  RiverbankHighFlowZone,
+  User,
+  AuthResponse,
+  DosAndDontsRegistry,
 } from '@/types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -29,6 +38,15 @@ const client = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Attach JWT token from localStorage if logged in
+client.interceptors.request.use((config) => {
+  const token = localStorage.getItem('jaldrishti_auth_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 // ── Health ────────────────────────────────────────────────────────────────────
@@ -66,7 +84,7 @@ export const getRiverStations = async (stateCode?: string): Promise<RiverStation
   const res = await client.get('/rivers/stations', {
     params: stateCode ? { state_code: stateCode } : {},
   });
-  return res.data;
+  return Array.isArray(res.data) ? res.data : (res.data.stations || []);
 };
 
 export const getRiverDischarge = async (stationCode: string): Promise<RiverDischargeResponse> => {
@@ -86,9 +104,17 @@ export const getDistrictRisk = async (districtCode: string): Promise<FloodRiskRe
 };
 
 // ── Alerts ────────────────────────────────────────────────────────────────────
-export const getAlerts = async (stateCode?: string): Promise<OfficialAlert[]> => {
-  const res = await client.get('/alerts', {
-    params: stateCode ? { state_code: stateCode } : {},
+export const getAlerts = async (stateCode?: string, hazardType?: string): Promise<OfficialAlert[]> => {
+  const params: Record<string, string> = {};
+  if (stateCode) params.state = stateCode;
+  if (hazardType && hazardType !== 'all') params.hazard_type = hazardType;
+  const res = await client.get('/alerts', { params });
+  return Array.isArray(res.data) ? res.data : (res.data.alerts || []);
+};
+
+export const getDosAndDonts = async (hazardType?: string): Promise<DosAndDontsRegistry> => {
+  const res = await client.get('/alerts/dos-and-donts', {
+    params: hazardType ? { hazard_type: hazardType } : {},
   });
   return res.data;
 };
@@ -150,6 +176,111 @@ export const getForecasts = async (lat: number, lon: number, days = 7) => {
 // ── Data Sources ──────────────────────────────────────────────────────────────
 export const getDataSources = async (): Promise<DataSourceHealth[]> => {
   const res = await client.get('/data-sources');
+  return res.data;
+};
+
+// ── Community Rescue ──────────────────────────────────────────────────────────
+export const getRescueRequests = async (params?: {
+  status?: RescueStatus;
+  lat?: number;
+  lon?: number;
+  radius_km?: number;
+}): Promise<RescueRequest[]> => {
+  const res = await client.get('/rescue', { params });
+  return Array.isArray(res.data) ? res.data : (res.data.requests || []);
+};
+
+export const getRescueStatistics = async (): Promise<RescueStatistics> => {
+  const res = await client.get('/rescue/statistics');
+  return res.data;
+};
+
+export const submitRescueRequest = async (data: {
+  contact_name: string;
+  phone: string;
+  lat: number;
+  lon: number;
+  address_landmark: string;
+  people_count?: number;
+  has_infants_or_elderly?: boolean;
+  medical_emergency_notes?: string;
+  water_level_stage?: string;
+}): Promise<RescueRequest> => {
+  const res = await client.post('/rescue', data);
+  return res.data;
+};
+
+export const updateRescueStatus = async (
+  id: number,
+  data: {
+    status: RescueStatus;
+    rescued_by?: string;
+    rescue_notes?: string;
+  },
+): Promise<RescueRequest> => {
+  const res = await client.patch(`/rescue/${id}/status`, data);
+  return res.data;
+};
+
+// ── Marine & Coastal Fishermen Safety ─────────────────────────────────────────
+export const getMarineConditions = async (lat = 20.2644, lon = 86.6710): Promise<MarineConditions> => {
+  const res = await client.get('/marine/conditions', { params: { lat, lon } });
+  return res.data;
+};
+
+export const getCoastalZones = async (): Promise<CoastalFishingZone[]> => {
+  const res = await client.get('/marine/zones');
+  return res.data;
+};
+
+export const getRiverbankZones = async (): Promise<RiverbankHighFlowZone[]> => {
+  const res = await client.get('/marine/riverbanks');
+  return res.data;
+};
+
+// ── User Authentication & Profile ─────────────────────────────────────────────
+export const login = async (email: string, password: string): Promise<AuthResponse> => {
+  const res = await client.post('/auth/login', { email, password });
+  if (res.data.access_token) {
+    localStorage.setItem('jaldrishti_auth_token', res.data.access_token);
+  }
+  return res.data;
+};
+
+export const register = async (data: {
+  email: string;
+  password: string;
+  full_name: string;
+  phone?: string;
+  role?: string;
+  district_code?: string;
+}): Promise<AuthResponse> => {
+  const res = await client.post('/auth/register', data);
+  if (res.data.access_token) {
+    localStorage.setItem('jaldrishti_auth_token', res.data.access_token);
+  }
+  return res.data;
+};
+
+export const getMe = async (): Promise<User> => {
+  const res = await client.get('/auth/me');
+  return res.data;
+};
+
+export const updateUserLocation = async (lat: number, lon: number, districtCode?: string) => {
+  const res = await client.patch('/auth/location', { lat, lon, district_code: districtCode });
+  return res.data;
+};
+
+export const logout = () => {
+  localStorage.removeItem('jaldrishti_auth_token');
+};
+
+// ── AI Assistant ──────────────────────────────────────────────────────────────
+export const askAssistant = async (
+  message: string,
+): Promise<{ reply: string; source_tag: string }> => {
+  const res = await client.post('/assistant/chat', { message }, { timeout: 45000 });
   return res.data;
 };
 

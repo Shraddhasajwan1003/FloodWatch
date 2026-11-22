@@ -16,6 +16,10 @@ from app.api.v1 import (
     forecasts,
     data_sources,
     notifications,
+    rescue,
+    marine,
+    auth,
+    assistant,
 )
 
 router = APIRouter()
@@ -27,6 +31,10 @@ router.include_router(rainfall.router)
 router.include_router(rivers.router)
 router.include_router(risk.router)
 router.include_router(alerts.router)
+router.include_router(rescue.router)
+router.include_router(marine.router)
+router.include_router(auth.router)
+router.include_router(assistant.router)
 
 # Routers without embedded prefix:
 router.include_router(routes.router, prefix="/routes", tags=["Safe Routes"])

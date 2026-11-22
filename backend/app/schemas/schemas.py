@@ -198,7 +198,11 @@ class NearbyResponse(BaseModel):
 
 class HourlyRainfallPoint(BaseModel):
     time: datetime
+    valid_at: Optional[str] = None
     precipitation_mm: Optional[float] = Field(None, description="mm of rainfall; null if sensor gap")
+    precipitation_probability_pct: Optional[float] = None
+    temperature_2m_c: Optional[float] = None
+    data_type: str = "forecast"
 
 
 class RainfallResponse(ProvenanceBase):
@@ -211,6 +215,12 @@ class RainfallResponse(ProvenanceBase):
     )
     unit: str = Field(default="mm", description="Precipitation unit")
     total_mm: Optional[float] = Field(None, description="Sum over the period; null when data_quality!=GOOD")
+    total_1h_mm: Optional[float] = None
+    total_6h_mm: Optional[float] = None
+    total_24h_mm: Optional[float] = None
+    forecast_24h_mm: Optional[float] = None
+    elevation_m: Optional[float] = None
+    attribution: Optional[str] = "Weather data: Open-Meteo.com (CC BY 4.0)"
     hourly: List[HourlyRainfallPoint]
 
 
@@ -219,13 +229,40 @@ class RainfallResponse(ProvenanceBase):
 # ---------------------------------------------------------------------------
 
 class RiverStationOut(BaseModel):
+    id: Optional[int] = None
     station_code: str
     name: str
     river_name: str
-    state_code: str
+    state_code: Optional[str] = None
     lat: float
     lon: float
-    is_active: bool
+    measurement_type: str = "discharge_m3s"
+    warning_level_m: Optional[float] = None
+    danger_level_m: Optional[float] = None
+    is_active: bool = True
+    source_id: str = "open-meteo-flood-glofas"
+
+    @model_validator(mode="before")
+    @classmethod
+    def set_station_codes(cls, data: Any):
+        if hasattr(data, "station_code"):
+            st = getattr(data, "state", None)
+            st_code = getattr(st, "code", None) if st else getattr(data, "state_code", None)
+            return {
+                "id": getattr(data, "id", None),
+                "station_code": getattr(data, "station_code"),
+                "name": getattr(data, "name", ""),
+                "river_name": getattr(data, "river_name", ""),
+                "state_code": st_code or "IN",
+                "lat": getattr(data, "lat", 0.0),
+                "lon": getattr(data, "lon", 0.0),
+                "measurement_type": getattr(data, "measurement_type", "discharge_m3s"),
+                "warning_level_m": getattr(data, "warning_level_m", None),
+                "danger_level_m": getattr(data, "danger_level_m", None),
+                "is_active": getattr(data, "is_active", True),
+                "source_id": getattr(data, "source_id", "open-meteo-flood-glofas"),
+            }
+        return data
 
     model_config = {"from_attributes": True}
 
@@ -236,11 +273,12 @@ class RiverStationsResponse(BaseModel):
 
 
 class DischargeForecastPoint(BaseModel):
-    time: datetime
-    discharge_m3s: Optional[float] = Field(None, description="m³/s; null when missing in model output")
-    return_period_exceeded: Optional[float] = Field(
-        None, description="Return period (years) exceeded by this value; null if unknown"
-    )
+    time: Optional[datetime] = None
+    valid_date: Optional[str] = None
+    river_discharge_m3s: Optional[float] = None
+    discharge_m3s: Optional[float] = None
+    data_type: str = "glofas_forecast"
+    return_period_exceeded: Optional[float] = None
 
 
 class DischargeResponse(ProvenanceBase):
@@ -252,7 +290,18 @@ class DischargeResponse(ProvenanceBase):
         description="Always shown to avoid mistaking model output for gauge data",
     )
     unit: str = Field(default="m³/s")
-    forecast: List[DischargeForecastPoint]
+    attribution: str = Field(
+        default="River discharge: GloFAS / Open-Meteo Flood API under CC BY 4.0"
+    )
+    quality: DataQuality = DataQuality.GOOD
+    station: Optional[RiverStationOut] = None
+    daily: List[DischargeForecastPoint] = Field(default_factory=list)
+    forecast: List[DischargeForecastPoint] = Field(default_factory=list)
+    latest_discharge_m3s: Optional[float] = None
+    latest_date: Optional[str] = None
+    disclaimer: str = Field(
+        default="Hydrological Caveat: Model discharge from GloFAS via Open-Meteo Flood API — NOT an official Indian government river gauge reading."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -260,35 +309,49 @@ class DischargeResponse(ProvenanceBase):
 # ---------------------------------------------------------------------------
 
 class RiskBreakdown(BaseModel):
-    rainfall_contribution: float = Field(..., ge=0, le=1)
-    river_level_contribution: float = Field(..., ge=0, le=1)
-    official_alert_override: bool = Field(
-        ..., description="True when an official govt alert forces minimum risk level"
-    )
+    rainfall_contribution: Optional[float] = None
+    river_level_contribution: Optional[float] = None
+    official_alert_override: bool = False
     official_alert_level: Optional[RiskLevel] = None
-    community_report_count: int = Field(default=0)
-    composite_score: float = Field(..., ge=0, le=1)
+    community_report_count: int = 0
+    composite_score: Optional[float] = None
+    recent_rainfall_1h: Optional[float] = None
+    recent_rainfall_6h: Optional[float] = None
+    forecast_rainfall_24h: Optional[float] = None
+    river_level_pct: Optional[float] = None
+    river_rise_rate: Optional[float] = None
+    community_reports: Optional[float] = None
 
 
 class FloodRiskResponse(BaseModel):
     lat: float
     lon: float
-    risk_level: RiskLevel
-    risk_score: float = Field(..., ge=0, le=1)
-    breakdown: RiskBreakdown
-    data_quality: DataQuality
-    computed_at: datetime
+    district_code: Optional[str] = None
+    district_name: Optional[str] = None
+    risk_level: Optional[RiskLevel] = None
+    level: str = "green"
+    displayed_level: str = "green"
+    score: Optional[float] = None
+    risk_score: Optional[float] = None
+    official_override: bool = False
+    model_version: str = "rule-based-v1"
+    is_provisional: bool = True
+    assessed_at: Optional[str] = None
+    breakdown: RiskBreakdown = Field(default_factory=lambda: RiskBreakdown())
+    data_quality: DataQuality = DataQuality.GOOD
     disclaimer: str = Field(
         default=(
             "Risk score is model-derived. Always follow official government "
             "warnings which take precedence over any score shown here."
         )
     )
-    sources_used: List[str]
-    missing_sources: List[str] = Field(
-        default_factory=list,
-        description="Data sources that were unavailable during scoring",
-    )
+    sources_used: List[str] = Field(default_factory=list)
+    missing_sources: List[str] = Field(default_factory=list)
+    missing_inputs: List[str] = Field(default_factory=list)
+    explanation: str = ""
+    rainfall_1h_mm: Optional[float] = None
+    rainfall_24h_mm: Optional[float] = None
+    forecast_24h_mm: Optional[float] = None
 
 
 class DistrictRiskResponse(FloodRiskResponse):
@@ -302,23 +365,78 @@ class DistrictRiskResponse(FloodRiskResponse):
 # ---------------------------------------------------------------------------
 
 class AlertOut(BaseModel):
+    id: Optional[int] = None
     alert_id: str
-    state_code: str
+    source_id: str = "ndma-sachet"
+    state_code: Optional[str] = "IN"
     district_code: Optional[str] = None
-    severity: RiskLevel
-    title: str
-    description: str
-    issued_by: str = Field(..., description="Issuing government body (e.g. IMD, NDMA, SDMA)")
-    issued_at: datetime
+    severity: str = "warning"
+    hazard_type: str = "flood"
+    title: Optional[str] = None
+    headline: Optional[str] = None
+    description: Optional[str] = None
+    area_description: Optional[str] = None
+    dos_and_donts: Optional[Any] = None
+    issued_by: Optional[str] = "NDMA SACHET / IMD"
+    issuer: Optional[str] = "NDMA SACHET / IMD"
+    issued_at: Optional[datetime] = None
+    effective_at: Optional[datetime] = None
     valid_until: Optional[datetime] = None
-    is_active: bool
+    expires_at: Optional[datetime] = None
+    retrieved_at: Optional[datetime] = None
+    is_active: bool = True
     source_url: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def set_alert_fields(cls, data: Any):
+        if hasattr(data, "alert_id"):
+            eff = getattr(data, "effective_at", None) or getattr(data, "issued_at", None) or datetime.now(timezone.utc)
+            exp = getattr(data, "expires_at", None) or getattr(data, "valid_until", None)
+            hl = getattr(data, "headline", None) or getattr(data, "title", "Official Flood Advisory")
+            iss = getattr(data, "issuer", None) or getattr(data, "issued_by", "NDMA SACHET")
+            sev = getattr(data, "severity", "warning")
+            if hasattr(sev, "value"):
+                sev = sev.value
+            haz = getattr(data, "hazard_type", "flood")
+            dnd_raw = getattr(data, "dos_and_donts_json", None)
+            dnd = None
+            if dnd_raw:
+                try:
+                    import json
+                    dnd = json.loads(dnd_raw)
+                except Exception:
+                    dnd = None
+            return {
+                "id": getattr(data, "id", None),
+                "alert_id": getattr(data, "alert_id"),
+                "source_id": getattr(data, "source_id", "ndma-sachet"),
+                "state_code": "IN",
+                "district_code": getattr(data, "district_code", None),
+                "severity": str(sev),
+                "hazard_type": str(haz),
+                "title": hl,
+                "headline": hl,
+                "description": getattr(data, "description", None),
+                "area_description": getattr(data, "area_description", None),
+                "dos_and_donts": dnd,
+                "issued_by": iss,
+                "issuer": iss,
+                "issued_at": eff,
+                "effective_at": eff,
+                "valid_until": exp,
+                "expires_at": exp,
+                "retrieved_at": getattr(data, "retrieved_at", eff),
+                "is_active": getattr(data, "is_active", True),
+                "source_url": getattr(data, "source_url", None),
+            }
+        return data
 
     model_config = {"from_attributes": True}
 
 
 class AlertListResponse(BaseModel):
-    state_code: Optional[str]
+    state_code: Optional[str] = None
     total: int
     alerts: List[AlertOut]
 

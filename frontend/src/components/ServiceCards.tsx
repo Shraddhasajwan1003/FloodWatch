@@ -8,6 +8,8 @@ import {
   AlertTriangle,
   Hospital,
   ArrowRight,
+  LifeBuoy,
+  Anchor,
 } from 'lucide-react';
 
 interface ServiceCardsProps {
@@ -48,6 +50,22 @@ export const ServiceCards: React.FC<ServiceCardsProps> = ({ onCheckArea, onOpenR
       to: '/safe-routes',
       actionText: 'Plan Route',
       accentColor: 'border-l-4 border-l-[#B79A62]',
+    },
+    {
+      title: 'Fishermen & Coastal Sea Watch',
+      description: 'Real-time ocean wave height, swell period, port warning hoist signals, and heavy flow riverbank settlement safety advisories.',
+      icon: Anchor,
+      to: '/coastal-marine',
+      actionText: 'Marine Watch',
+      accentColor: 'border-l-4 border-l-cyan-600',
+    },
+    {
+      title: 'Community Rescue Tracker',
+      description: 'Track who is stranded vs who has been rescued in real-time, submit distress SOS, and coordinate volunteer relief.',
+      icon: LifeBuoy,
+      to: '/rescue',
+      actionText: 'Track Rescues',
+      accentColor: 'border-l-4 border-l-red-600',
     },
     {
       title: 'Report Waterlogging',

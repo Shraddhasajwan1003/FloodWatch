@@ -11,10 +11,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # ── Identity ────────────────────────────────────────────────────────────
-    APP_NAME: str = "FloodWatch India"
-    APP_VERSION: str = "0.1.0"
+    APP_NAME: str = "JalDrishti India"
+    APP_VERSION: str = "0.2.0"
     APP_DESCRIPTION: str = (
-        "India-wide flood intelligence and emergency safe-route platform"
+        "JalDrishti — National Flood Intelligence, Emergency Safe-Route & Community Rescue Platform"
     )
 
     # ── API ─────────────────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
 
     # ── Database ─────────────────────────────────────────────────────────────
     # Default: SQLite for local development. Change to PostgreSQL for production.
-    DATABASE_URL: str = "sqlite+aiosqlite:///./floodwatch.db"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./jaldrishti.db"
 
     # ── CORS ─────────────────────────────────────────────────────────────────
     ALLOWED_ORIGINS: List[str] = [
@@ -38,10 +38,11 @@ class Settings(BaseSettings):
     OPEN_METEO_BASE_URL: str = "https://api.open-meteo.com/v1"
     OPEN_METEO_FLOOD_URL: str = "https://flood-api.open-meteo.com/v1"
     OPEN_METEO_HISTORICAL_URL: str = "https://archive-api.open-meteo.com/v1"
+    OPEN_METEO_MARINE_URL: str = "https://marine-api.open-meteo.com/v1/marine"
 
     # Nominatim (OSM geocoding, free with attribution, rate-limited)
     NOMINATIM_BASE_URL: str = "https://nominatim.openstreetmap.org"
-    NOMINATIM_USER_AGENT: str = "FloodWatchIndia/0.1 (educational-project)"
+    NOMINATIM_USER_AGENT: str = "JalDrishtiIndia/0.2 (educational-civic-project)"
 
     # OSRM public demo (rate-limited, not for production scale)
     OSRM_BASE_URL: str = "https://router.project-osrm.org"
@@ -52,6 +53,7 @@ class Settings(BaseSettings):
     # Optional: paid or restricted services (disabled if not set)
     IMD_API_KEY: str = ""
     CWC_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
 
     # ── Ingestion schedule ────────────────────────────────────────────────────
     WEATHER_REFRESH_MINUTES: int = 60

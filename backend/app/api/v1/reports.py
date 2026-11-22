@@ -12,10 +12,12 @@ import aiofiles
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
+import json
 from app.core.database import get_db
 from app.core.config import get_settings
 from app.models.models import CommunityReport, ReportStatus
 from app.services.routing_service import haversine_km
+from app.services.ai_forgery_detector import analyze_report_authenticity
 
 settings = get_settings()
 router = APIRouter()
@@ -78,6 +80,21 @@ async def create_report(
     now = datetime.now(timezone.utc)
     expires = now + timedelta(hours=settings.REPORT_EXPIRE_HOURS)
 
+    # AI Forgery & Duplicate Credibility Layer
+    # Check nearby reports count
+    stmt_nearby = select(CommunityReport)
+    res_nearby = await db.execute(stmt_nearby)
+    all_reps = res_nearby.scalars().all()
+    nearby_c = len([r for r in all_reps if haversine_km(lat, lon, r.lat, r.lon) <= 2.0])
+
+    trust_score, is_suspicious, flags = analyze_report_authenticity(
+        category=category,
+        description=description,
+        water_depth_cm=water_depth_cm,
+        nearby_reports_count=nearby_c,
+        has_photo=bool(image_path),
+    )
+
     report = CommunityReport(
         category=category,
         description=description,
@@ -87,6 +104,9 @@ async def create_report(
         road_blocked=road_blocked,
         image_path=image_path,
         status=ReportStatus.UNVERIFIED,
+        ai_trust_score=trust_score,
+        ai_flags_json=json.dumps(flags),
+        is_suspicious=is_suspicious,
         submitted_at=now,
         expires_at=expires,
     )
