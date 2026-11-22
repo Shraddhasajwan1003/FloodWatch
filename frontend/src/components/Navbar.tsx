@@ -120,7 +120,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             ) : (
               <div className="hidden sm:flex items-center gap-2">
-                <span className="text-xs font-semibold text-gray-800">{user.name || user.email}</span>
+                <span className="text-xs font-semibold text-gray-800">{user.full_name || user.email}</span>
                 {user.role === 'admin' ? (
                   <span className="text-[10px] font-bold bg-red-100 text-red-700 border border-red-200 rounded-full px-2 py-0.5">
                     🛡️ Admin
@@ -202,7 +202,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             <div className="flex items-center justify-between px-2 py-2 bg-gray-50 rounded-md mb-2">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-gray-800">{user.name || user.email}</span>
+                <span className="text-xs font-semibold text-gray-800">{user.full_name || user.email}</span>
                 {user.role === 'admin' ? (
                   <span className="text-[10px] font-bold bg-red-100 text-red-700 rounded-full px-2 py-0.5">🛡️ Admin</span>
                 ) : (
